@@ -105,7 +105,7 @@ const MSG_BOT_INFO = (
     "Sizning har bir xabaringiz biz uchun muhim va botni yanada qulay qilishga yordam beradi 🚀"
 );
 const MSG_TASK_DESC = "✏️ Vazifa tavsifini kiriting:";
-const MSG_TASK_DATE_TIME = "📆 Oy-kun va vaqtni yozing (MM-DD HH:MM):\nMisol: 01-15 14:30";
+const MSG_TASK_DATE_TIME = "📆 Oy-kun va vaqtni yozing (MM.DD HH:MM):\nMisol: 01.15 14:30";
 const MSG_TASK_ADDED = "✅ Vazifa qo'shildi!\n📌 {desc}\n🕓 {dt}";
 const MSG_REMINDER = "🔔 Eslatma! Vaqti keldi:\n📌 {desc}\n\nBajardingizmi?";
 const MSG_DONE = "🎉 Ajoyib! Vazifa bajarildi! Davom eting 🔥";
@@ -118,7 +118,7 @@ const MSG_NO_TODAY = "🎯 Bugun vazifa yo'q — dam olishingiz mumkin!";
 const MSG_TOMORROW_HEADER = "🗓️ Ertangi vazifalar ({date}):";
 const MSG_NO_TOMORROW = "🛌 Ertaga vazifa yo'q — hozir qo'shishingiz mumkin!";
 const MSG_TOMORROW_ADD = "🗓️ Ertangi vazifa qo'shmoqchimisiz?\n\n✏️ Tavsifni yozing:";
-const MSG_INVALID_FORMAT = "❌ Noto'g'ri format. MM-DD HH:MM ko'rinishida yozing.\nMisol: 02-10 09:00";
+const MSG_INVALID_FORMAT = "❌ Noto'g'ri format. MM.DD HH:MM ko'rinishida yozing.\nMisol: 02.10 09:00";
 const MSG_PAST_TIME = "⏰ Bu vaqt o'tib ketgan. Kelajakdagi vaqtni tanlang.";
 const MSG_NOT_REGISTERED = "🚫 Avval /start bilan ro'yxatdan o'ting.";
 const MSG_STATS = (
@@ -189,7 +189,7 @@ bot.command('tasks', async (ctx) => {
     for (let idx = 0; idx < tasks.length; idx++) {
         const task = tasks[idx];
         const taskDt = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
-        const timeStr = taskDt.format('MM-DD HH:mm');
+        const timeStr = taskDt.format('MM.DD HH:mm');
         const statusEmoji = task.done ? '✅' : '⏳';
         const text = `${statusEmoji} <b>${task.description}</b>\n🕓 ${timeStr}`;
 
@@ -214,6 +214,7 @@ bot.command('today', async (ctx) => {
     }
 
     const todayStr = dayjs().format('YYYY-MM-DD');
+    const todayDisplay = dayjs().format('MM.DD');
     const pendingToday = data.users[userId].tasks.filter(t => t.datetime.startsWith(todayStr) && !t.done);
 
     if (pendingToday.length > 0) {
@@ -230,7 +231,7 @@ bot.command('today', async (ctx) => {
         return;
     }
 
-    let msg = MSG_TODAY_HEADER.replace('{date}', todayStr.slice(5, 10)) + "\n\n";
+    let msg = MSG_TODAY_HEADER.replace('{date}', todayDisplay) + "\n\n";
     for (const t of allToday) {
         const status = t.done ? '✅' : '⏳';
         msg += `${status} ${t.description} — ${t.datetime.slice(11)}\n`;
@@ -248,7 +249,7 @@ bot.command('tomorrow', async (ctx) => {
 
     const tomorrow = dayjs().add(1, 'day');
     const tomorrowStr = tomorrow.format('YYYY-MM-DD');
-    const tomorrowDateDisplay = tomorrow.format('MM-DD');
+    const tomorrowDateDisplay = tomorrow.format('MM.DD');
 
     const tasks = data.users[userId].tasks.filter(t => t.datetime.startsWith(tomorrowStr));
     if (tasks.length > 0) {
@@ -294,7 +295,8 @@ bot.command('weekly', async (ctx) => {
     let doneCount = 0;
     for (const t of weekTasks) {
         const status = t.done ? '✅' : '❌';
-        msg += `${status} ${t.description} — ${t.datetime.slice(5, 16)}\n`;
+        const timeStr = dayjs(t.datetime).format('MM.DD HH:mm');
+        msg += `${status} ${t.description} — ${timeStr}\n`;
         if (t.done) doneCount++;
     }
     msg += `\n📈 Natija: ${doneCount}/${weekTasks.length} ta bajarildi!`;
@@ -352,7 +354,7 @@ bot.on('text', async (ctx) => {
         ctx.session.task_desc = text;
         ctx.session.state = 'task_datetime';
         if (ctx.session.tomorrow_add) {
-            const tomorrow = dayjs().add(1, 'day').format('MM-DD');
+            const tomorrow = dayjs().add(1, 'day').format('MM.DD');
             await ctx.reply(`📆 Ertangi sana: ${tomorrow}\n\nVaqtni kiriting (HH:MM):`);
         } else {
             await ctx.reply(MSG_TASK_DATE_TIME);
@@ -373,7 +375,9 @@ bot.on('text', async (ctx) => {
                 timePart = parts[1];
             }
 
-            const fullDateStr = `${DEFAULT_YEAR}-${datePart}`;
+            // Sana formatini MM.DD dan MM-DD ga o'zgartirish (saqlash uchun ichki format)
+            const normalizedDatePart = datePart.replace('.', '-');
+            const fullDateStr = `${DEFAULT_YEAR}-${normalizedDatePart}`;
             const fullDtStr = `${fullDateStr} ${timePart}`;
             const fullDt = dayjs(fullDtStr, 'YYYY-MM-DD HH:mm');
             if (!fullDt.isValid()) throw new Error('format');
@@ -388,7 +392,8 @@ bot.on('text', async (ctx) => {
             };
             data.users[userId].tasks.push(task);
             saveData(data);
-            await ctx.reply(MSG_TASK_ADDED.replace('{desc}', task.description).replace('{dt}', task.datetime));
+            const displayDt = fullDt.format('MM.DD HH:mm');
+            await ctx.reply(MSG_TASK_ADDED.replace('{desc}', task.description).replace('{dt}', displayDt));
             ctx.session = {};
         } catch (e) {
             if (e.message === 'past') {
@@ -403,24 +408,38 @@ bot.on('text', async (ctx) => {
 // === CALLBACK ===
 bot.on('callback_query', async (ctx) => {
     const query = ctx.callbackQuery;
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery(); // Telegraf v4 uchun to'g'ri
+
     const dataParts = query.data.split('_');
     const action = dataParts[0];
     const userId = dataParts[1];
     const taskIndex = parseInt(dataParts[2]);
 
+    if (!userId || isNaN(taskIndex)) return;
+
     const data = loadData();
     const user = data.users[userId];
-    if (user && taskIndex < user.tasks.length) {
-        const task = user.tasks[taskIndex];
-        if (action === 'done') {
-            task.done = true;
-            await ctx.editMessageText(query.message.text + "\n\n🎉 Bajarildi! Ajoyib ish!", { parse_mode: 'HTML' });
-        } else if (action === 'notdone') {
-            await ctx.editMessageText(query.message.text + "\n\n😔 Keyingi safar! Ishonamiz sizga 💪", { parse_mode: 'HTML' });
-        }
-        saveData(data);
+    if (!user || taskIndex >= user.tasks.length) return;
+
+    const task = user.tasks[taskIndex];
+    const taskDt = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
+    const formattedDt = taskDt.format('MM.DD HH:mm'); // Nuqta bilan
+
+    if (action === 'done') {
+        task.done = true;
+        await ctx.editMessageText(
+            query.message.text.replace(/⏳/, '✅') + `\n🕓 ${formattedDt}\n\n🎉 Bajarildi! Ajoyib ish!`,
+            { parse_mode: 'HTML' }
+        );
+        await ctx.reply(MSG_DONE);
+    } else if (action === 'notdone') {
+        await ctx.editMessageText(
+            query.message.text + `\n🕓 ${formattedDt}\n\n😔 Keyingi safar! Ishonamiz sizga 💪`,
+            { parse_mode: 'HTML' }
+        );
+        await ctx.reply(MSG_NOT_DONE);
     }
+    saveData(data);
 });
 
 // === ESLATMA VA QO'SHIMCHA ESLATMA ===
