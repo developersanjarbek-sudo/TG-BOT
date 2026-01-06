@@ -1,0 +1,11 @@
+{
+  "name": "todo-bot",
+  "version": "1.0.0",
+  "main": "bot.js",
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "dayjs": "^1.11.13"
+  }
+}
