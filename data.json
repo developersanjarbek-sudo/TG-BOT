@@ -27,6 +27,42 @@
                     "status": "active",
                     "createdAt": "2026-01-07 21:31",
                     "postponeCount": 0
+                },
+                {
+                    "desc": "Salomberdik",
+                    "datetime": "2026-01-07 22:55",
+                    "done": false,
+                    "reminded": true,
+                    "priority": "high",
+                    "category": "other",
+                    "difficulty": 4,
+                    "status": "active",
+                    "createdAt": "2026-01-07 22:54",
+                    "postponeCount": 0
+                },
+                {
+                    "desc": "assdasd",
+                    "datetime": "2026-01-07 23:04",
+                    "done": false,
+                    "reminded": true,
+                    "priority": "high",
+                    "category": "study",
+                    "difficulty": 4,
+                    "status": "active",
+                    "createdAt": "2026-01-07 23:03",
+                    "postponeCount": 0
+                },
+                {
+                    "desc": "saasd",
+                    "datetime": "2026-01-07 23:08",
+                    "done": false,
+                    "reminded": true,
+                    "priority": "high",
+                    "category": "other",
+                    "difficulty": 5,
+                    "status": "active",
+                    "createdAt": "2026-01-07 23:08",
+                    "postponeCount": 0
                 }
             ],
             "habits": [],
@@ -63,6 +99,12 @@
                     "voiceId": "AwACAgIAAxkBAAPyaV6KLfNtPM--t0bDa6_wEaYf-XwAAqeSAAKUP_lKLZy3KLfN3rM4BA",
                     "time": "21:31",
                     "desc": null
+                },
+                {
+                    "voiceId": "AwACAgIAAxkBAAMaaV6fMyjKU6oYVTEfXpkbveJGVBAAArqUAAKfsfBKUqsOvleKZoQ4BA",
+                    "time": "23:01",
+                    "desc": null,
+                    "lastSent": "2026-01-07"
                 }
             ],
             "achievements": [
@@ -74,7 +116,25 @@
                 {
                     "desc": "Erta tongi maqsadlarni bajarish",
                     "time": "21:51",
-                    "customText": "Tursangi"
+                    "customText": "Tursangi",
+                    "lastSent": "2026-01-07"
+                },
+                {
+                    "desc": "sad",
+                    "time": "22:56",
+                    "customText": "scas3c",
+                    "lastSent": "2026-01-07"
+                },
+                {
+                    "desc": "kkkj",
+                    "time": "22:58",
+                    "customText": "kk",
+                    "lastSent": "2026-01-07"
+                }
+            ],
+            "notes": [
+                {
+                    "text": "sads"
                 }
             ]
         },

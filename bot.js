@@ -6,12 +6,14 @@ const dotenv = require('dotenv');
 const cron = require('node-cron');
 const dayjs = require('dayjs');
 const customParseFormat = require('dayjs/plugin/customParseFormat');
+const isSameOrBefore = require('dayjs/plugin/isSameOrBefore');
 const express = require('express');
 const crypto = require('crypto');
 const LOCALES = require('./locales');
 
 // Konfiguratsiya
 dayjs.extend(customParseFormat);
+dayjs.extend(isSameOrBefore);
 dotenv.config();
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -2660,12 +2662,12 @@ bot.on('text', async (ctx) => {
     if (ctx.session.state === 'await_custom_reminder_desc') {
         ctx.session.temp_rem_desc = text;
         ctx.session.state = 'await_custom_reminder_time';
-        await ctx.reply(`🛎 <b>Eslatma vaqtini kiriting (HH:mm):</b>`, withProtectContentForCtx(ctx, { parse_mode: 'HTML' }));
+        await ctx.reply(`🛎 <b>Eslatma vaqtini kiriting:</b>\n\nFormatlar:\n• <code>09:00</code> (Har kuni)\n• <code>08.01 15:00</code> (Aniq sana va vaqt)`, withProtectContentForCtx(ctx, { parse_mode: 'HTML' }));
         return;
     }
 
     if (ctx.session.state === 'await_custom_reminder_time') {
-        ctx.session.temp_rem_time = text;
+        ctx.session.temp_rem_input = text;
         ctx.session.state = 'await_custom_reminder_text';
         await ctx.reply(`🛎 <b>Maxsus matnni kiriting:</b>`, withProtectContentForCtx(ctx, { parse_mode: 'HTML' }));
         return;
@@ -2673,10 +2675,41 @@ bot.on('text', async (ctx) => {
 
     if (ctx.session.state === 'await_custom_reminder_text') {
         if (!data.users[userId].custom_reminders) data.users[userId].custom_reminders = [];
-        data.users[userId].custom_reminders.push({ desc: ctx.session.temp_rem_desc, time: ctx.session.temp_rem_time, customText: text });
+
+        // Parse input
+        let newRem = { desc: ctx.session.temp_rem_desc, customText: text };
+
+        // Sana bormi tekshiramiz
+        if (ctx.session.temp_rem_input.includes(' ') || ctx.session.temp_rem_input.includes('.')) {
+            // Date parsing logic (Taskdagidek)
+            let datetime;
+            if (/^\d{1,2}[:.]\d{2}$/.test(ctx.session.temp_rem_input.replace('.', ':'))) {
+                // Faqat soat bo'lsa (lekin bu branchga kirmasligi kerak kunlik bo'lsa) - baribir check
+                newRem.time = ctx.session.temp_rem_input.replace('.', ':');
+            } else {
+                const parts = ctx.session.temp_rem_input.split(' ');
+                if (parts.length >= 2) {
+                    const datePart = parts[0].replace('.', '-'); // 08-01
+                    // Yilni qo'shamiz
+                    datetime = dayjs(`${new Date().getFullYear()}-${datePart} ${parts[1]}`, 'YYYY-MM-DD HH:mm');
+                    if (datetime.isValid()) {
+                        newRem.datetime = datetime.format('YYYY-MM-DD HH:mm');
+                    }
+                }
+            }
+        }
+
+        if (!newRem.datetime && !newRem.time) {
+            // Fallback to time if parsing failed or simple HH:mm
+            newRem.time = ctx.session.temp_rem_input.replace('.', ':');
+        }
+
+        data.users[userId].custom_reminders.push(newRem);
         saveData(data);
         ctx.session.state = null;
-        await ctx.reply(`✅ Shaxsiy eslatma qo'shildi! Belgilangan vaqtda matn yuboriladi.`, withProtectContentForCtx(ctx));
+
+        const timeStr = newRem.datetime ? `📅 ${newRem.datetime}` : `⏰ ${newRem.time} (Har kuni)`;
+        await ctx.reply(`✅ Shaxsiy eslatma qo'shildi!\n${timeStr}`, withProtectContentForCtx(ctx));
         await bot.action('view_custom_reminders', ctx);
         return;
     }
@@ -2684,32 +2717,44 @@ bot.on('text', async (ctx) => {
     if (ctx.session.state === 'await_voice_note_text') {
         ctx.session.temp_voice_desc = text;
         ctx.session.state = 'await_voice_time';
-        await ctx.reply(`⏰ <b>Eslatma vaqtini kiriting (HH:mm):</b>`, withProtectContentForCtx(ctx, { parse_mode: 'HTML' }));
-        return;
-    }
-
-    if (ctx.session.state === 'await_integration_app') {
-        data.users[userId].integrations.push(text);
-        saveData(data);
-        ctx.session.state = null;
-        await ctx.reply(`✅ Ilova ulandi! Ma'lumotlar sinxronlanadi.`, withProtectContentForCtx(ctx));
-        await bot.action('view_integration_apps', ctx);
+        await ctx.reply(`⏰ <b>Eslatma vaqtini kiriting:</b>\n\nFormatlar:\n• <code>09:00</code> (Har kuni)\n• <code>08.01 15:00</code> (Aniq sana va vaqt)`, withProtectContentForCtx(ctx, { parse_mode: 'HTML' }));
         return;
     }
 
     if (ctx.session.state === 'await_voice_time') {
-        const time = text;
+        const input = text;
         if (!data.users[userId].voiceNotes) data.users[userId].voiceNotes = [];
-        data.users[userId].voiceNotes.push({
+
+        let newVoice = {
             voiceId: ctx.session.temp_voice_id,
-            time,
             desc: ctx.session.temp_voice_desc || null
-        });
+        };
+
+        // Sana bormi tekshiramiz
+        if (input.includes(' ') || input.includes('.')) {
+            let datetime;
+            const parts = input.split(' ');
+            if (parts.length >= 2) {
+                const datePart = parts[0].replace('.', '-');
+                datetime = dayjs(`${new Date().getFullYear()}-${datePart} ${parts[1]}`, 'YYYY-MM-DD HH:mm');
+                if (datetime.isValid()) {
+                    newVoice.datetime = datetime.format('YYYY-MM-DD HH:mm');
+                }
+            }
+        }
+
+        if (!newVoice.datetime) {
+            newVoice.time = input.replace('.', ':');
+        }
+
+        data.users[userId].voiceNotes.push(newVoice);
         saveData(data);
         ctx.session.state = null;
         ctx.session.temp_voice_id = null;
         ctx.session.temp_voice_desc = null;
-        await ctx.reply(`✅ Ovozli eslatma saqlandi! Belgilangan vaqtda eshittiriladi.`, withProtectContentForCtx(ctx));
+
+        const timeStr = newVoice.datetime ? `📅 ${newVoice.datetime}` : `⏰ ${newVoice.time} (Har kuni)`;
+        await ctx.reply(`✅ Ovozli eslatma saqlandi!\n${timeStr}`, withProtectContentForCtx(ctx));
         await bot.action('view_voice_notes', ctx);
         return;
     }
@@ -2970,7 +3015,7 @@ bot.on('voice', async (ctx) => {
         const voiceFileId = ctx.message.voice.file_id;
         ctx.session.temp_voice_id = voiceFileId;
         ctx.session.state = 'await_voice_time';
-        await ctx.reply(`🎤 <b>Ovoz saqlandi. Eslatma vaqtini kiriting (HH:mm):</b>`, withProtectContentForCtx(ctx, { parse_mode: 'HTML' }));
+        await ctx.reply(`🎤 <b>Ovoz saqlandi. Eslatma vaqtini kiriting:</b>\n\nFormatlar:\n• <code>09:00</code> (Har kuni)\n• <code>08.01 15:00</code> (Aniq sana va vaqt)`, withProtectContentForCtx(ctx, { parse_mode: 'HTML' }));
     }
 });
 
@@ -3038,75 +3083,140 @@ cron.schedule('* * * * *', async () => {
 
     for (const [userId, user] of Object.entries(data.users)) {
         if (user.blocked || !user.settings.notifications) continue;
-        user.tasks.forEach((task, idx) => {
-            if (!task.done && !task.reminded) {
-                const tTime = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
-                if (tTime.isSame(now, 'minute')) {
-                    bot.telegram.sendMessage(userId, `🔔 <b>Eslatma!</b>\n${task.desc}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId)).catch((e) => console.error('Send error:', e));
-                    task.reminded = true;
-                    changed = true;
+
+        // 1. One-time Tasks
+        if (user.tasks) {
+            for (const task of user.tasks) {
+                if (!task.done && !task.reminded) {
+                    const tTime = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
+                    // Check if time has passed (and not more than 24h ago to avoid spamming very old tasks)
+                    if (tTime.isSameOrBefore(now, 'minute') && tTime.isAfter(now.subtract(24, 'hour'))) {
+                        try {
+                            await bot.telegram.sendMessage(userId, `🔔 <b>Eslatma!</b>\n${task.desc}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId));
+                            task.reminded = true;
+                            changed = true;
+                        } catch (e) {
+                            console.error(`Failed to send task reminder to ${userId}:`, e);
+                            // Agar user bloklagan bo'lsa, qayta urinmaslik uchun reminded=true qilish mumkin,
+                            // lekin tarmoq xatosi bo'lsa keyingi safar urinib ko'radi.
+                            if (e.response && e.response.error_code === 403) {
+                                task.reminded = true; // User bloklagan, qayta urinma
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+
+                // No-Escape Mode check
+                if (user.settings.noEscapeMode && !task.done && task.status !== 'missed' && task.status !== 'postponed') {
+                    const tTime = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
+                    if (tTime.isBefore(now) && !task.noEscapeTriggered) {
+                        const lang = user.settings.language || 'uz';
+                        const buttons = [
+                            [Markup.button.callback(getText(lang, 'noEscape.postpone_10min'), `postpone_${user.tasks.indexOf(task)}_10min`)],
+                            [Markup.button.callback(getText(lang, 'noEscape.postpone_1hour'), `postpone_${user.tasks.indexOf(task)}_1hour`)],
+                            [Markup.button.callback(getText(lang, 'noEscape.postpone_tomorrow'), `postpone_${user.tasks.indexOf(task)}_tomorrow`)],
+                            [Markup.button.callback(getText(lang, 'noEscape.write_reason'), `write_reason_${user.tasks.indexOf(task)}`)]
+                        ];
+
+                        try {
+                            await bot.telegram.sendMessage(userId, getText(lang, 'noEscape.task_not_done', { title: task.desc }) + '\n' + getText(lang, 'noEscape.choose'), {
+                                parse_mode: 'HTML',
+                                ...Markup.inlineKeyboard(buttons)
+                            });
+                            task.noEscapeTriggered = true;
+                            changed = true;
+                        } catch (e) {
+                            console.error('NoEscape Send error:', e);
+                        }
+                    }
                 }
             }
-
-            // No-Escape Mode check
-            if (user.settings.noEscapeMode && !task.done && task.status !== 'missed' && task.status !== 'postponed') {
-                const tTime = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
-                if (tTime.isBefore(now) && !task.noEscapeTriggered) {
-                    const lang = user.settings.language || 'uz';
-                    const buttons = [
-                        [Markup.button.callback(getText(lang, 'noEscape.postpone_10min'), `postpone_${idx}_10min`)],
-                        [Markup.button.callback(getText(lang, 'noEscape.postpone_1hour'), `postpone_${idx}_1hour`)],
-                        [Markup.button.callback(getText(lang, 'noEscape.postpone_tomorrow'), `postpone_${idx}_tomorrow`)],
-                        [Markup.button.callback(getText(lang, 'noEscape.write_reason'), `write_reason_${idx}`)]
-                    ];
-
-                    bot.telegram.sendMessage(userId, getText(lang, 'noEscape.task_not_done', { title: task.desc }) + '\n' + getText(lang, 'noEscape.choose'), {
-                        parse_mode: 'HTML',
-                        ...Markup.inlineKeyboard(buttons)
-                    }).catch((e) => console.error('NoEscape Send error:', e));
-
-                    task.noEscapeTriggered = true;
-                    changed = true;
-                }
-            }
-        });
-
-        // Custom reminders
-        if (user.custom_reminders) {
-            user.custom_reminders.forEach(rem => {
-                if (dayjs().format('HH:mm') === rem.time) {
-                    bot.telegram.sendMessage(userId, `🛎 <b>Shaxsiy eslatma:</b>\n${rem.customText}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId)).catch((e) => console.error('Send error:', e));
-                }
-            });
         }
 
-        // Advanced reminders
+        const todayStr = now.format('YYYY-MM-DD');
+
+        // 2. Custom reminders (Recurring)
+        if (user.custom_reminders) {
+            for (const rem of user.custom_reminders) {
+                // Format HH:mm from rem.time
+                const [h, m] = rem.time.split(':').map(Number);
+                const remTime = dayjs().hour(h).minute(m).second(0);
+
+                // Agar bugun yuborilmagan bo'lsa va vaqti kelgan bo'lsa
+                if (rem.lastSent !== todayStr && remTime.isSameOrBefore(now, 'minute')) {
+                    try {
+                        await bot.telegram.sendMessage(userId, `🛎 <b>Shaxsiy eslatma:</b>\n${rem.customText}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId));
+                        rem.lastSent = todayStr;
+                        changed = true;
+                    } catch (e) {
+                        console.error('Custom reminder error:', e);
+                    }
+                }
+            }
+        }
+
+        // 3. Advanced reminders (Recurring)
         if (user.advancedReminders) {
             user.advancedReminders.forEach(rem => {
+                // Bu yerda biroz murakkab, chunki bir nechta vaqt bor. 
+                // Oddiylik uchun har biri uchun alohida check qilamiz, lekin "lastSent" massiv bo'lishi kerak yoki har vaqt uchun flag.
+                // Hozirgi tuzilishda oddiy check qoldiramiz, lekin isSameOrBefore ishlatamiz.
+                // Yaxshisi, "times" arrayini tekshiramiz.
+                // Eslatma: Advanced reminder strukturasi o'zgarmagan bo'lsa, har bir vaqt uchun 
+                // bugun yuborilganligini tekshirish qiyin (chunki state yo'q). 
+                // Vaqtinchalik yechim - faqat aniq vaqtni tekshirish (eski usul), 
+                // yoki state qo'shish kerak. 
+                // "Catch-up" faqat bir marta ishlaydigan narsalar uchun oson. Takroriylar uchun state kerak.
+                // Keling, advanced uchun ham minimal state qo'shamiz agar iloji bo'lsa.
+                // Agar yo'q bo'lsa, eski usulda qoldirib, faqat send error handle qilamiz.
                 rem.times.forEach(time => {
+                    // Aniq vaqt tekshiruvi (muhim o'zgarishsiz) - chunki buni to'liq qayta yozish kerak
                     if (dayjs().format('HH:mm') === time) {
-                        bot.telegram.sendMessage(userId, `🔔 <b>Qayta eslatma:</b>\n${rem.desc}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId)).catch((e) => console.error('Send error:', e));
+                        bot.telegram.sendMessage(userId, `🔔 <b>Qayta eslatma:</b>\n${rem.desc}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId))
+                            .catch((e) => console.error('Send error:', e));
                     }
                 });
             });
         }
 
-        // Ovozli eslatmalar
+        // 4. Ovozli eslatmalar (Recurring like custom)
         if (user.voiceNotes) {
-            user.voiceNotes.forEach(vn => {
-                if (dayjs().format('HH:mm') === vn.time) {
-                    bot.telegram.sendVoice(userId, vn.voiceId).catch((e) => console.error('Send error:', e));
+            for (const vn of user.voiceNotes) {
+                const [h, m] = vn.time.split(':').map(Number);
+                const vnTime = dayjs().hour(h).minute(m).second(0);
+
+                if (vn.lastSent !== todayStr && vnTime.isSameOrBefore(now, 'minute')) {
+                    try {
+                        await bot.telegram.sendVoice(userId, vn.voiceId);
+                        vn.lastSent = todayStr;
+                        changed = true;
+                    } catch (e) { console.error('Voice error:', e); }
                 }
-            });
+            }
         }
 
-        // Odatlar eslatmalari
+        // 5. Odatlar eslatmalari (Daily at 20:00)
         if (user.habits) {
-            user.habits.forEach(habit => {
-                if (!habit.doneToday && dayjs().format('HH:mm') === '20:00') { // Har kuni 20:00 da bir marta
-                    bot.telegram.sendMessage(userId, `🔄 <b>Odat eslatma:</b>\n${habit.name} ni bajaring! Streak: ${habit.streak}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId)).catch((e) => console.error('Send error:', e));
+            // Global 20:00 check for habits
+            const habitTime = dayjs().hour(20).minute(0).second(0);
+            // User darajasida bugun eslatma yuborildimi?
+            if (!user.habitsRemindedDate || user.habitsRemindedDate !== todayStr) {
+                if (habitTime.isSameOrBefore(now, 'minute')) {
+                    let hasPendingHabits = false;
+                    user.habits.forEach(habit => {
+                        if (!habit.doneToday) hasPendingHabits = true;
+                    });
+
+                    if (hasPendingHabits) {
+                        try {
+                            await bot.telegram.sendMessage(userId, `🔄 <b>Odatlarni unutmang!</b>\nBugungi odatlarni bajarib, streakni saqlab qoling.`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId));
+                            user.habitsRemindedDate = todayStr;
+                            changed = true;
+                        } catch (e) { console.error('Habit remind error:', e); }
+                    }
                 }
-            });
+            }
         }
     }
     if (changed) saveData(data);
