@@ -2,76 +2,110 @@
     "users": {
         "7695728173": {
             "name": "Sanjarbek",
-            "xp": 1150,
+            "xp": 4090,
             "tasks": [
                 {
                     "desc": "Salom",
-                    "datetime": "2026-01-07 15:54",
-                    "done": false,
-                    "reminded": true
-                },
-                {
-                    "desc": "Salom",
-                    "datetime": "2026-01-07 16:37",
+                    "datetime": "2026-01-07 21:01",
                     "done": false,
                     "reminded": true,
-                    "priority": "normal",
-                    "category": null
-                }
-            ],
-            "habits": [
+                    "priority": "high",
+                    "category": "other",
+                    "difficulty": 4,
+                    "status": "active",
+                    "createdAt": "2026-01-07 21:00",
+                    "postponeCount": 0
+                },
                 {
-                    "name": "salom",
-                    "streak": 0,
-                    "doneToday": false
+                    "desc": "Erta turish",
+                    "datetime": "2026-01-07 21:32",
+                    "done": false,
+                    "reminded": true,
+                    "priority": "high",
+                    "category": "study",
+                    "difficulty": 5,
+                    "status": "active",
+                    "createdAt": "2026-01-07 21:31",
+                    "postponeCount": 0
                 }
             ],
+            "habits": [],
             "unlocked": [
                 "statistics",
                 "habits",
-                "team_collaboration"
+                "motivation",
+                "goal_chat",
+                "voice_notes",
+                "ai_tips",
+                "custom_themes",
+                "social_sharing",
+                "achievements",
+                "progress_reports",
+                "custom_reminders",
+                "calendar",
+                "notes",
+                "categories"
             ],
             "blocked": false,
-            "joinedAt": "2026-01-07T09:19:11.555Z",
+            "joinedAt": "2026-01-07T15:47:13.984Z",
             "settings": {
                 "notifications": true,
-                "language": "uz"
+                "language": "uz",
+                "theme": "light"
             },
             "lastBonusDate": "2026-01-07",
-            "teams": [
+            "state": null,
+            "integrations": [
+                "apps"
+            ],
+            "voiceNotes": [
                 {
-                    "name": "Salom",
-                    "members": [
-                        "7695728173"
-                    ],
-                    "sharedTasks": [],
-                    "inviteCode": "team_1767785198600_lbchvlhgo"
-                },
+                    "voiceId": "AwACAgIAAxkBAAPyaV6KLfNtPM--t0bDa6_wEaYf-XwAAqeSAAKUP_lKLZy3KLfN3rM4BA",
+                    "time": "21:31",
+                    "desc": null
+                }
+            ],
+            "achievements": [
+                "500 XP",
+                "1000 XP",
+                "5 funksiya"
+            ],
+            "custom_reminders": [
                 {
-                    "name": "salom",
-                    "ownerId": "7695728173",
-                    "members": [
-                        "7695728173"
-                    ],
-                    "sharedTasks": [],
-                    "inviteCode": "team_1767785155227_m0o05lxza",
-                    "createdAt": "2026-01-07T11:25:55.227Z"
+                    "desc": "Erta tongi maqsadlarni bajarish",
+                    "time": "21:51",
+                    "customText": "Tursangi"
                 }
             ]
         },
         "8014950410": {
             "name": "Alibek",
-            "xp": 2050,
+            "xp": 1999999140,
             "tasks": [],
             "habits": [],
-            "unlocked": [],
+            "unlocked": [
+                "ai_tips",
+                "custom_themes",
+                "achievements",
+                "pomodoro",
+                "goal_chat"
+            ],
             "blocked": false,
-            "joinedAt": "2026-01-07T11:30:05.886Z",
+            "joinedAt": "2026-01-07T15:55:44.142Z",
             "settings": {
                 "notifications": true,
-                "language": "uz"
+                "language": "uz",
+                "theme": "dark"
             },
-            "lastBonusDate": "2026-01-07"
+            "lastBonusDate": "2026-01-07",
+            "integrations": [
+                "apps"
+            ],
+            "achievements": [
+                "500 XP",
+                "1000 XP"
+            ],
+            "state": "goal_chat"
         }
     },
     "settings": {}
