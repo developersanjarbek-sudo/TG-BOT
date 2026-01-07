@@ -63,6 +63,18 @@
                     "status": "active",
                     "createdAt": "2026-01-07 23:08",
                     "postponeCount": 0
+                },
+                {
+                    "desc": "4",
+                    "datetime": "2026-01-07 23:28",
+                    "done": false,
+                    "reminded": true,
+                    "priority": "high",
+                    "category": "personal",
+                    "difficulty": 4,
+                    "status": "active",
+                    "createdAt": "2026-01-07 23:27",
+                    "postponeCount": 0
                 }
             ],
             "habits": [],
@@ -90,7 +102,7 @@
                 "theme": "light"
             },
             "lastBonusDate": "2026-01-07",
-            "state": null,
+            "state": "goal_chat",
             "integrations": [
                 "apps"
             ],
@@ -130,6 +142,12 @@
                     "time": "22:58",
                     "customText": "kk",
                     "lastSent": "2026-01-07"
+                },
+                {
+                    "desc": "77272",
+                    "customText": "Jsj",
+                    "datetime": "2026-01-07 23:30",
+                    "sent": true
                 }
             ],
             "notes": [

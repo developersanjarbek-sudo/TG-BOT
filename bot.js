@@ -1151,7 +1151,9 @@ bot.action('view_custom_reminders', async (ctx) => {
 
     let text = `🛎 <b>Shaxsiy Eslatmalar</b>\n\n`;
     user.custom_reminders.forEach((rem, idx) => {
-        text += `${rem.desc} - ${rem.time} (${rem.customText})\n`;
+        const timeStr = rem.datetime ? `📅 ${rem.datetime}` : `⏰ ${rem.time} (Har kuni)`;
+        const statusStr = rem.sent ? ' ✅' : '';
+        text += `${rem.desc} - ${timeStr}${statusStr}\n`;
     });
 
     const buttons = [
@@ -3136,21 +3138,43 @@ cron.schedule('* * * * *', async () => {
 
         const todayStr = now.format('YYYY-MM-DD');
 
-        // 2. Custom reminders (Recurring)
+        // 2. Custom reminders (One-time va Recurring)
         if (user.custom_reminders) {
             for (const rem of user.custom_reminders) {
-                // Format HH:mm from rem.time
-                const [h, m] = rem.time.split(':').map(Number);
-                const remTime = dayjs().hour(h).minute(m).second(0);
+                // A) One-time datetime eslatma (aniq sana va vaqt)
+                if (rem.datetime) {
+                    if (!rem.sent) {
+                        const remTime = dayjs(rem.datetime, 'YYYY-MM-DD HH:mm');
+                        // Vaqti kelgan va 24 soatdan ko'p o'tmagan bo'lsa
+                        if (remTime.isSameOrBefore(now, 'minute') && remTime.isAfter(now.subtract(24, 'hour'))) {
+                            try {
+                                await bot.telegram.sendMessage(userId, `🛎 <b>Shaxsiy eslatma:</b>\n${rem.customText}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId));
+                                rem.sent = true;
+                                changed = true;
+                            } catch (e) {
+                                console.error('Custom reminder (datetime) error:', e);
+                                if (e.response && e.response.error_code === 403) {
+                                    rem.sent = true;
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                // B) Recurring (Har kuni) eslatma
+                else if (rem.time) {
+                    const [h, m] = rem.time.split(':').map(Number);
+                    const remTime = dayjs().hour(h).minute(m).second(0);
 
-                // Agar bugun yuborilmagan bo'lsa va vaqti kelgan bo'lsa
-                if (rem.lastSent !== todayStr && remTime.isSameOrBefore(now, 'minute')) {
-                    try {
-                        await bot.telegram.sendMessage(userId, `🛎 <b>Shaxsiy eslatma:</b>\n${rem.customText}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId));
-                        rem.lastSent = todayStr;
-                        changed = true;
-                    } catch (e) {
-                        console.error('Custom reminder error:', e);
+                    // Agar bugun yuborilmagan bo'lsa va vaqti kelgan bo'lsa
+                    if (rem.lastSent !== todayStr && remTime.isSameOrBefore(now, 'minute')) {
+                        try {
+                            await bot.telegram.sendMessage(userId, `🛎 <b>Shaxsiy eslatma:</b>\n${rem.customText}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId));
+                            rem.lastSent = todayStr;
+                            changed = true;
+                        } catch (e) {
+                            console.error('Custom reminder (recurring) error:', e);
+                        }
                     }
                 }
             }
@@ -3180,18 +3204,40 @@ cron.schedule('* * * * *', async () => {
             });
         }
 
-        // 4. Ovozli eslatmalar (Recurring like custom)
+        // 4. Ovozli eslatmalar (One-time va Recurring)
         if (user.voiceNotes) {
             for (const vn of user.voiceNotes) {
-                const [h, m] = vn.time.split(':').map(Number);
-                const vnTime = dayjs().hour(h).minute(m).second(0);
+                // A) One-time datetime eslatma
+                if (vn.datetime) {
+                    if (!vn.sent) {
+                        const vnTime = dayjs(vn.datetime, 'YYYY-MM-DD HH:mm');
+                        if (vnTime.isSameOrBefore(now, 'minute') && vnTime.isAfter(now.subtract(24, 'hour'))) {
+                            try {
+                                await bot.telegram.sendVoice(userId, vn.voiceId);
+                                vn.sent = true;
+                                changed = true;
+                            } catch (e) {
+                                console.error('Voice (datetime) error:', e);
+                                if (e.response && e.response.error_code === 403) {
+                                    vn.sent = true;
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                // B) Recurring (Har kuni) eslatma
+                else if (vn.time) {
+                    const [h, m] = vn.time.split(':').map(Number);
+                    const vnTime = dayjs().hour(h).minute(m).second(0);
 
-                if (vn.lastSent !== todayStr && vnTime.isSameOrBefore(now, 'minute')) {
-                    try {
-                        await bot.telegram.sendVoice(userId, vn.voiceId);
-                        vn.lastSent = todayStr;
-                        changed = true;
-                    } catch (e) { console.error('Voice error:', e); }
+                    if (vn.lastSent !== todayStr && vnTime.isSameOrBefore(now, 'minute')) {
+                        try {
+                            await bot.telegram.sendVoice(userId, vn.voiceId);
+                            vn.lastSent = todayStr;
+                            changed = true;
+                        } catch (e) { console.error('Voice (recurring) error:', e); }
+                    }
                 }
             }
         }
