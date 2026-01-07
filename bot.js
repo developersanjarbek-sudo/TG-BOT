@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const cron = require('node-cron');
 const dayjs = require('dayjs');
 const customParseFormat = require('dayjs/plugin/customParseFormat');
+const express = require('express'); // <-- Qo'shildi
 
 dayjs.extend(customParseFormat);
 
@@ -278,7 +279,7 @@ bot.command('weekly', async (ctx) => {
     }
 
     const now = dayjs();
-    const startOfWeek = now.subtract(now.day(), 'day'); // Assuming Monday start, adjust if needed
+    const startOfWeek = now.subtract(now.day(), 'day'); // Assuming Monday start
     const endOfWeek = startOfWeek.add(6, 'day');
 
     const weekTasks = data.users[userId].tasks.filter(t => {
@@ -335,7 +336,7 @@ bot.command('help', async (ctx) => {
 
 // === XABAR ISHLOVCHI ===
 bot.on('text', async (ctx) => {
-    if (ctx.message.text.startsWith('/')) return; // Commands handled separately
+    if (ctx.message.text.startsWith('/')) return;
     const userId = ctx.from.id.toString();
     const text = ctx.message.text.trim();
     const state = ctx.session.state;
@@ -375,7 +376,6 @@ bot.on('text', async (ctx) => {
                 timePart = parts[1];
             }
 
-            // Sana formatini MM.DD dan MM-DD ga o'zgartirish (saqlash uchun ichki format)
             const normalizedDatePart = datePart.replace('.', '-');
             const fullDateStr = `${DEFAULT_YEAR}-${normalizedDatePart}`;
             const fullDtStr = `${fullDateStr} ${timePart}`;
@@ -408,7 +408,7 @@ bot.on('text', async (ctx) => {
 // === CALLBACK ===
 bot.on('callback_query', async (ctx) => {
     const query = ctx.callbackQuery;
-    await ctx.answerCbQuery(); // Telegraf v4 uchun to'g'ri
+    await ctx.answerCbQuery();
 
     const dataParts = query.data.split('_');
     const action = dataParts[0];
@@ -423,7 +423,7 @@ bot.on('callback_query', async (ctx) => {
 
     const task = user.tasks[taskIndex];
     const taskDt = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
-    const formattedDt = taskDt.format('MM.DD HH:mm'); // Nuqta bilan
+    const formattedDt = taskDt.format('MM.DD HH:mm');
 
     if (action === 'done') {
         task.done = true;
@@ -453,7 +453,6 @@ async function checkReminders() {
             if (task.done) continue;
             const taskDt = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
             if (taskDt.isBefore(now) || taskDt.isSame(now)) {
-                // Birinchi eslatma
                 if (!task.reminded) {
                     const keyboard = Markup.inlineKeyboard([
                         Markup.button.callback('✅ Bajardim', `done_${userId}_${idx}`),
@@ -468,7 +467,6 @@ async function checkReminders() {
                     task.last_overdue_reminder = now.format('YYYY-MM-DD HH:mm:ss');
                     saveData(data);
                 } else {
-                    // Har soatda qo'shimcha eslatma
                     const lastStr = task.last_overdue_reminder;
                     if (lastStr) {
                         const lastReminder = dayjs(lastStr, 'YYYY-MM-DD HH:mm:ss');
@@ -506,12 +504,40 @@ async function sendDailyMotivation() {
 }
 
 // Scheduling
-setInterval(checkReminders, 30 * 1000); // Every 30 seconds
-cron.schedule('0 6 * * *', sendDailyMotivation); // Daily at 6:00
+setInterval(checkReminders, 30 * 1000);
+cron.schedule('0 6 * * *', sendDailyMotivation);
 
 console.log("🤖 To'liq zamonaviy TodoBot ishga tushdi!");
-bot.launch();
 
-// Handle graceful stop
+// ==================== EXPRESS + WEBHOOK (Render uchun) ====================
+
+const app = express();
+const secretPath = `/${BOT_TOKEN}`; // Xavfsiz webhook yo'li
+
+app.use(bot.webhookCallback(secretPath));
+
+app.get('/', (req, res) => {
+    res.send('Telegram Todo Bot ishlayapti! 🚀');
+});
+
+// Webhook ni avto o'rnatish (Render domaini mavjud bo'lsa)
+if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    const webhookUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}${secretPath}`;
+    bot.telegram.setWebhook(webhookUrl)
+        .then(() => console.log(`Webhook muvaffaqiyatli o'rnatildi: ${webhookUrl}`))
+        .catch(err => console.error('Webhook ornatishda xato:', err));
+} else {
+    // Localda test uchun polling
+    console.log('Local rejim: polling ishlatilmoqda');
+    bot.launch();
+}
+
+// Render portini tinglash
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+    console.log(`Server ${port} portda ishga tushdi`);
+});
+
+// Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
