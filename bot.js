@@ -3529,6 +3529,153 @@ cron.schedule('0 20 * * *', async () => {
 
 console.log('✅ Haftalik tahlil tizimi yoqildi!');
 
+// --- ESLATMALAR TIZIMI ---
+// Har 60 soniyada vazifalar va eslatmalarni tekshirish
+setInterval(async () => {
+    const data = loadData();
+    const now = dayjs();
+    const todayStr = now.format('YYYY-MM-DD');
+
+    for (const [userId, user] of Object.entries(data.users)) {
+        if (!user.settings?.notifications) continue;
+        const lang = user.settings?.language || 'uz';
+
+        // 1. Task reminders - vazifa vaqti kelganida eslatma yuborish
+        for (const task of (user.tasks || [])) {
+            if (task.done || task.reminded) continue;
+            const taskTime = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
+            if (taskTime.isValid() && taskTime.isSameOrBefore(now)) {
+                try {
+                    const text = getText(lang, 'reminder.task') || `⏰ <b>Eslatma!</b>\n\n📋 ${task.desc}\n⏱ Vaqt: ${taskTime.format('HH:mm')}`;
+                    await bot.telegram.sendMessage(userId,
+                        `⏰ <b>Eslatma!</b>\n\n📋 ${task.desc}\n⏱ Vaqt: ${taskTime.format('HH:mm')}`,
+                        { parse_mode: 'HTML' }
+                    );
+                    task.reminded = true;
+                    saveData(data);
+                    console.log(`✅ Task reminder sent to ${userId}: ${task.desc}`);
+                } catch (e) {
+                    console.error(`❌ Task reminder error for ${userId}:`, e.message);
+                }
+            }
+        }
+
+        // 2. Custom reminders - shaxsiy eslatmalar
+        for (const reminder of (user.custom_reminders || [])) {
+            if (reminder.sent && reminder.lastSent === todayStr) continue;
+
+            let reminderTime;
+            if (reminder.datetime) {
+                reminderTime = dayjs(reminder.datetime, 'YYYY-MM-DD HH:mm');
+            } else if (reminder.time) {
+                reminderTime = dayjs(`${todayStr} ${reminder.time}`, 'YYYY-MM-DD HH:mm');
+            }
+
+            if (reminderTime && reminderTime.isValid() && reminderTime.isSameOrBefore(now)) {
+                if (reminder.lastSent === todayStr && !reminder.datetime) continue; // Kunlik eslatma allaqachon yuborilgan
+
+                try {
+                    await bot.telegram.sendMessage(userId,
+                        `🔔 <b>Shaxsiy eslatma!</b>\n\n📝 ${reminder.desc}\n💬 ${reminder.customText || ''}`,
+                        { parse_mode: 'HTML' }
+                    );
+                    reminder.lastSent = todayStr;
+                    reminder.sent = true;
+                    saveData(data);
+                    console.log(`✅ Custom reminder sent to ${userId}: ${reminder.desc}`);
+                } catch (e) {
+                    console.error(`❌ Custom reminder error for ${userId}:`, e.message);
+                }
+            }
+        }
+
+        // 3. Voice notes reminders - ovozli eslatmalar
+        for (const voiceNote of (user.voiceNotes || [])) {
+            if (voiceNote.lastSent === todayStr || !voiceNote.time) continue;
+            const noteTime = dayjs(`${todayStr} ${voiceNote.time}`, 'YYYY-MM-DD HH:mm');
+            if (noteTime.isValid() && noteTime.isSameOrBefore(now)) {
+                try {
+                    await bot.telegram.sendVoice(userId, voiceNote.voiceId, {
+                        caption: `🎤 <b>Ovozli eslatma!</b>\n${voiceNote.desc || ''}`,
+                        parse_mode: 'HTML'
+                    });
+                    voiceNote.lastSent = todayStr;
+                    saveData(data);
+                    console.log(`✅ Voice reminder sent to ${userId}`);
+                } catch (e) {
+                    console.error(`❌ Voice reminder error for ${userId}:`, e.message);
+                }
+            }
+        }
+    }
+}, 60000); // Har 60 soniyada
+
+// --- HABITS VA MOTIVATSIYA ERTALABKI ESLATMASI ---
+cron.schedule('0 8 * * *', async () => {
+    console.log('🔔 Ertalabki eslatmalar yuborilmoqda...');
+    const data = loadData();
+
+    for (const [userId, user] of Object.entries(data.users)) {
+        if (!user.settings?.notifications) continue;
+        const lang = user.settings?.language || 'uz';
+
+        // Habits eslatmasi
+        if (user.unlocked?.includes('habits') && user.habits?.length > 0) {
+            // Odatlarni yangi kun uchun reset qilish
+            user.habits.forEach(h => h.doneToday = false);
+            saveData(data);
+
+            const habitsList = user.habits.map(h => `• ${h.name}`).join('\n');
+            try {
+                await bot.telegram.sendMessage(userId,
+                    `🔄 <b>Odatlar eslatmasi!</b>\n\nBugungi bajariladigan odatlaringiz:\n${habitsList}`,
+                    { parse_mode: 'HTML' }
+                );
+                console.log(`✅ Habits reminder sent to ${userId}`);
+            } catch (e) {
+                console.error(`❌ Habits reminder error for ${userId}:`, e.message);
+            }
+        }
+
+        // Motivatsiya moduli
+        if (user.unlocked?.includes('motivation')) {
+            const motivationQuotes = {
+                uz: [
+                    "Har bir kun yangi imkoniyat! 🌅",
+                    "Kichik qadamlar katta muvaffaqiyatga olib boradi! 🚀",
+                    "Bugun siz kechagingizdana yaxshiroq bo'lishingiz mumkin! 💪",
+                    "Maqsadlaringiz uchun harakat qiling! 🎯",
+                    "Hech qachon taslim bo'lmang! 🔥"
+                ],
+                en: [
+                    "Every day is a new opportunity! 🌅",
+                    "Small steps lead to big success! 🚀",
+                    "Today you can be better than yesterday! 💪",
+                    "Work towards your goals! 🎯",
+                    "Never give up! 🔥"
+                ],
+                ru: [
+                    "Каждый день - новая возможность! 🌅",
+                    "Маленькие шаги ведут к большому успеху! 🚀",
+                    "Сегодня вы можете быть лучше, чем вчера! 💪",
+                    "Работайте над своими целями! 🎯",
+                    "Никогда не сдавайтесь! 🔥"
+                ]
+            };
+            const quotes = motivationQuotes[lang] || motivationQuotes.uz;
+            const quote = quotes[Math.floor(Math.random() * quotes.length)];
+            try {
+                await bot.telegram.sendMessage(userId, `🔥 <b>Bugungi motivatsiya:</b>\n\n${quote}`, { parse_mode: 'HTML' });
+                console.log(`✅ Motivation sent to ${userId}`);
+            } catch (e) {
+                console.error(`❌ Motivation error for ${userId}:`, e.message);
+            }
+        }
+    }
+});
+
+console.log('✅ Eslatmalar tizimi yoqildi!');
+
 // Bot start
 bot.launch().then(() => {
     console.log('🤖 Bot ishga tushdi!');
