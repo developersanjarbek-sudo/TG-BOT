@@ -2,7 +2,7 @@
     "users": {
         "7695728173": {
             "name": "Sanjarbek",
-            "xp": 4090,
+            "xp": 4140,
             "tasks": [
                 {
                     "desc": "Salom",
@@ -75,6 +75,18 @@
                     "status": "active",
                     "createdAt": "2026-01-07 23:27",
                     "postponeCount": 0
+                },
+                {
+                    "desc": "Salom bot",
+                    "datetime": "2026-01-08 09:33",
+                    "done": false,
+                    "reminded": true,
+                    "priority": "high",
+                    "category": "personal",
+                    "difficulty": 5,
+                    "status": "active",
+                    "createdAt": "2026-01-08 09:32",
+                    "postponeCount": 0
                 }
             ],
             "habits": [],
@@ -101,7 +113,7 @@
                 "language": "uz",
                 "theme": "light"
             },
-            "lastBonusDate": "2026-01-07",
+            "lastBonusDate": "2026-01-08",
             "state": "goal_chat",
             "integrations": [
                 "apps"

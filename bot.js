@@ -3076,23 +3076,48 @@ bot.on('document', async (ctx) => {
     }
 });
 
+// Vaqtni flexible parse qilish uchun funksiya
+function parseDateTime(dateTimeStr) {
+    // Turli formatlarni sinab ko'rish
+    const formats = [
+        'YYYY-MM-DD HH:mm',
+        'YYYY-MM-DDTHH:mm',
+        'YYYY-MM-DDTHH:mm:ss',
+        'YYYY-MM-DD HH:mm:ss'
+    ];
+    for (const format of formats) {
+        const parsed = dayjs(dateTimeStr, format);
+        if (parsed.isValid()) {
+            return parsed;
+        }
+    }
+    // Fallback - dayjs ning o'zi parse qilsin
+    return dayjs(dateTimeStr);
+}
+
 // --- CRON JOBS ---
 // Eslatmalar
 cron.schedule('* * * * *', async () => {
     const data = loadData();
     const now = dayjs();
+    const currentMinute = now.format('YYYY-MM-DD HH:mm'); // Joriy minut aniq
     let changed = false;
 
+    console.log(`[CRON] Eslatmalar tekshirilmoqda: ${currentMinute}`);
+
     for (const [userId, user] of Object.entries(data.users)) {
-        if (user.blocked || !user.settings.notifications) continue;
+        if (user.blocked || !user.settings || !user.settings.notifications) continue;
 
         // 1. One-time Tasks
         if (user.tasks) {
             for (const task of user.tasks) {
                 if (!task.done && !task.reminded) {
-                    const tTime = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
-                    // Check if time has passed (and not more than 24h ago to avoid spamming very old tasks)
-                    if (tTime.isSameOrBefore(now, 'minute') && tTime.isAfter(now.subtract(24, 'hour'))) {
+                    const tTime = parseDateTime(task.datetime);
+                    const taskMinute = tTime.format('YYYY-MM-DD HH:mm');
+
+                    // Aniq vaqtida YOKI o'tgan vaqtda (lekin 24 soatdan ko'p emas) eslatma yuborish
+                    if (tTime.isValid() && tTime.isSameOrBefore(now, 'minute') && tTime.isAfter(now.subtract(24, 'hour'))) {
+                        console.log(`[REMINDER] Task topildi: "${task.desc}" - Vaqti: ${taskMinute} - User: ${userId}`);
                         try {
                             await bot.telegram.sendMessage(userId, `🔔 <b>Eslatma!</b>\n${task.desc}`, withProtectContentForUser(user, { parse_mode: 'HTML' }, userId));
                             task.reminded = true;
@@ -3111,7 +3136,7 @@ cron.schedule('* * * * *', async () => {
 
                 // No-Escape Mode check
                 if (user.settings.noEscapeMode && !task.done && task.status !== 'missed' && task.status !== 'postponed') {
-                    const tTime = dayjs(task.datetime, 'YYYY-MM-DD HH:mm');
+                    const tTime = parseDateTime(task.datetime);
                     if (tTime.isBefore(now) && !task.noEscapeTriggered) {
                         const lang = user.settings.language || 'uz';
                         const buttons = [
@@ -3144,7 +3169,8 @@ cron.schedule('* * * * *', async () => {
                 // A) One-time datetime eslatma (aniq sana va vaqt)
                 if (rem.datetime) {
                     if (!rem.sent) {
-                        const remTime = dayjs(rem.datetime, 'YYYY-MM-DD HH:mm');
+                        const remTime = parseDateTime(rem.datetime);
+                        console.log(`[CUSTOM_REMINDER] Tekshirilmoqda: "${rem.desc || rem.customText}" - Vaqti: ${rem.datetime} - User: ${userId}`);
                         // Vaqti kelgan va 24 soatdan ko'p o'tmagan bo'lsa
                         if (remTime.isSameOrBefore(now, 'minute') && remTime.isAfter(now.subtract(24, 'hour'))) {
                             try {
@@ -3210,8 +3236,9 @@ cron.schedule('* * * * *', async () => {
                 // A) One-time datetime eslatma
                 if (vn.datetime) {
                     if (!vn.sent) {
-                        const vnTime = dayjs(vn.datetime, 'YYYY-MM-DD HH:mm');
-                        if (vnTime.isSameOrBefore(now, 'minute') && vnTime.isAfter(now.subtract(24, 'hour'))) {
+                        const vnTime = parseDateTime(vn.datetime);
+                        console.log(`[VOICE_NOTE] Tekshirilmoqda - Vaqti: ${vn.datetime} - User: ${userId}`);
+                        if (vnTime.isValid() && vnTime.isSameOrBefore(now, 'minute') && vnTime.isAfter(now.subtract(24, 'hour'))) {
                             try {
                                 await bot.telegram.sendVoice(userId, vn.voiceId);
                                 vn.sent = true;
